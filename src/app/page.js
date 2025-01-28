@@ -57,11 +57,12 @@ const App = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 p-8">
       <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-3xl border border-gray-200 flex flex-col h-[80vh]">
         <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">AI Chatbot Assistant</h1>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100 rounded-xl">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100 rounded-xl custom-scrollbar
+custom-scrollbar">
           {messages.map((msg, index) => (
             <div key={index} className={`p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-500 text-white self-end' : 'bg-gray-200 text-gray-900 self-start'}`}>{msg.content}</div>
           ))}
-          {loading && (
+          {loading && (   
             <div className="p-3 rounded-lg bg-gray-200 text-gray-900 self-start">
               <div className="flex space-x-2 justify-center items-center">
                 <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce"></div>
@@ -91,6 +92,7 @@ const App = () => {
           </button>
         </form>
       </div>
+      
     </div>
   );
 };
