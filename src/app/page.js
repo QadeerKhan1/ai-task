@@ -20,16 +20,16 @@ const App = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!input.trim()) return;
-  
+
     setLoading(true);
     setError("");
-  
+
     // Show user message immediately
     const userMessage = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
-  
+
     setInput("");
-  
+
     try {
       const res = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -39,38 +39,15 @@ const App = () => {
             {
               role: "user",
               content: `
-  You are an advanced AI Code Review Assistant. Your primary role is to analyze user-provided **code snippets** and generate **structured, JSON-formatted feedback**.
-  
-  ---
-  
-  ### **Handling Different Input Scenarios**
-  ✔ **If the user provides a valid code snippet, evaluate it and return structured JSON feedback.**  
-  ❌ **If the user provides non-code input, return a JSON response politely stating that only code reviews are supported.**  
-  
-  ---
-  
-  ### **Expected JSON Response Format**  
-  
-  #### **📌 1. Code Evaluation (Valid Code Input)**
-  {
-      "input_type": "code",
-      "code_snippet": "<provided_code_snippet>",
-      "evaluation": {
-          "errors": [],
-          "optimizations": [],
-          "best_practices": [],
-          "corrected_code": ""
-      }
-  }
-  
-  #### **📌 2. Non-Code Input (User Provided Text Instead of Code)**
-  {
-      "input_type": "non_code",
-      "message": "I am an AI Code Review Assistant. Please provide a valid code snippet for analysis.",
-      "suggestion": "If you're looking for technical insights, debugging assistance, or best practices, paste your code here."
-  }
-    ${input}
-                `,
+You are an AI assistant specializing in **interior design**. Your task is to refine and improve **interior design-related prompts** provided by the user.
+
+### **Instructions:**
+✔ If the input relates to **interior design**, generate a **better, clearer, and more refined prompt** for the user.
+❌ If the input is unrelated to interior design, respond with: "Sorry, I am an AI assistant for interior design. We are not dealing with this."
+
+### **User Input:**
+${input}
+              `,
             },
           ],
           max_tokens: 2000,
@@ -83,41 +60,57 @@ const App = () => {
           },
         }
       );
-  
-      const botResponse = res.data.choices[0].message.content;
-      const cleanContent = botResponse.replace(/```json|```/g, "").trim();
-      const parsedAnalysis = JSON.parse(cleanContent);
-      console.log(parsedAnalysis, "parsedAnalysis");
-  
-      // Store the AI response along with the user message
-      const botMessage = { role: "assistant", content: parsedAnalysis };
-      setMessages((prev) => [...prev, botMessage]);
-  
+
+      let botResponse = res.data.choices[0].message.content.trim();
+
+      // Remove surrounding quotes if they exist
+      if (botResponse.startsWith('"') && botResponse.endsWith('"')) {
+        botResponse = botResponse.slice(1, -1);
+      }
+
+      // Handle Non-Interior Design Inputs
+      if (
+        botResponse
+          .toLowerCase()
+          .includes("sorry, i am an ai assistant for interior design")
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "🚨 Sorry, I am an AI assistant for interior design. We are not dealing with this.",
+          },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: botResponse },
+        ]);
+      }
     } catch (err) {
       console.log(
-        "API Error:", 
-        err.response?.data && Object.keys(err.response.data)?.length > 0 
-          ? err.response.data 
+        "API Error:",
+        err.response?.data && Object.keys(err.response.data)?.length > 0
+          ? err.response.data
           : err.message || "Unknown error occurred"
       );
-  
-      // Remove the last user message since the API failed
+
+      // Remove last user message if API fails
       setMessages((prev) => prev.slice(0, -1));
-  
-      // Handle different API error messages
+
+      // Handle different API errors
       if (err.response?.data?.error?.code === "rate_limit_exceeded") {
-        setError(`🚨 API rate limit reached please try again `);
+        setError(`🚨 API rate limit reached, please try again later.`);
       } else if (err.response?.data?.error?.message) {
         setError(`🚨 API Error: ${err.response.data.error.message}`);
       } else {
         setError("🚨 Something went wrong. Please try again later.");
       }
-  } finally {
+    } finally {
       setLoading(false);
     }
   };
-  
-  
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -127,11 +120,11 @@ const App = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 p-8">
       <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-3xl border border-gray-200 flex flex-col h-[80vh]">
         <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">
-          AI Code Assistant
+          Interior Design Prompt Refiner
         </h1>
 
-    {/* Chat Messages Section */}
-    <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 bg-gray-100 rounded-xl custom-scrollbar">
+        {/* Chat Messages Section */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 bg-gray-100 rounded-xl custom-scrollbar">
           {messages.map((msg, index) => (
             <div
               key={index}
@@ -143,71 +136,20 @@ const App = () => {
             >
               {msg?.role === "user" ? (
                 msg?.content
-              ) : msg?.content?.input_type === "non_code" ? (
-                // Non-Code Message Handling
+              ) : msg?.content.includes(
+                  "Sorry, I am an AI assistant for interior design"
+                ) ? (
                 <div className="p-4 rounded-lg text-center text-red-600 font-semibold">
-                  🚨 {msg?.content?.message}
-                  <p className="text-gray-700 mt-2">{msg?.content?.suggestion}</p>
+                  {msg?.content}
                 </div>
               ) : (
-                // Code Analysis Section
                 <div className="p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-2">AI Code Analysis</h2>
-
-                  {/* Display Input Code */}
-                  <div className="p-3 bg-gray-800 text-white rounded-md">
-                    <h3 className="text-md font-semibold">🔹 Your Code:</h3>
-                    <pre className="whitespace-pre-wrap">{msg?.content?.code_snippet}</pre>
-                  </div>
-
-                  {/* Syntax Errors */}
-                  {msg?.content?.evaluation?.errors?.length > 0 && (
-                    <div className="mt-2">
-                      <h3 className="font-semibold text-red-600">❌ Errors Found:</h3>
-                      <ul className="list-disc list-inside text-red-500">
-                        {msg?.content?.evaluation?.errors?.map((error, idx) => (
-                          <li key={idx}>
-                            <strong>Line {error?.line}:</strong> {error}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Optimizations */}
-                  {msg?.content?.evaluation?.optimizations?.length > 0 && (
-                    <div className="mt-2">
-                      <h3 className="font-semibold text-yellow-600">⚡ Optimizations Suggested:</h3>
-                      <ul className="list-disc list-inside text-yellow-500">
-                        {msg?.content?.evaluation?.optimizations?.map((opt, idx) => (
-                          <li key={idx}>
-                            {opt}
-                           
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Best Practices */}
-                  {msg?.content?.evaluation?.best_practices?.length > 0 && (
-                    <div className="mt-2">
-                      <h3 className="font-semibold text-green-600">✅ Best Practices:</h3>
-                      <ul className="list-disc list-inside text-green-500">
-                        {msg?.content?.evaluation?.best_practices?.map((bp, idx) => (
-                          <li key={idx}>{bp}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Corrected Code */}
-                  {msg?.content?.evaluation?.corrected_code && (
-                    <div className="mt-4 p-3 bg-gray-800 text-white rounded-md">
-                      <h3 className="text-md font-semibold">🚀 Corrected Code:</h3>
-                      <pre className="whitespace-pre-wrap">{msg?.content?.evaluation?.corrected_code}</pre>
-                    </div>
-                  )}
+                  <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                    ✅ Refined Prompt:
+                  </h2>
+                  <pre className="whitespace-pre-wrap text-gray-900">
+                    {msg?.content}
+                  </pre>
                 </div>
               )}
             </div>
@@ -215,12 +157,8 @@ const App = () => {
 
           {/* Loading Animation */}
           {loading && (
-            <div className="p-3 rounded-lg bg-gray-200 text-gray-900 self-start">
-              <div className="flex space-x-2 justify-center items-center">
-                <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce"></div>
-                <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce delay-200"></div>
-                <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce delay-400"></div>
-              </div>
+            <div className="flex items-center justify-center h-[50px] rounded-lg bg-gray-200 text-gray-900 self-start">
+              <div className="loader-dots"></div>
             </div>
           )}
 
@@ -228,20 +166,33 @@ const App = () => {
         </div>
 
         {/* Error Display */}
-        {error && <p className="text-red-600 text-center mt-2 font-medium">{error}</p>}
+        {error && (
+          <p className="text-red-600 text-center mt-2 font-medium">{error}</p>
+        )}
 
         {/* Input Form */}
-        <form onSubmit={handleSubmit} className="mt-4 flex items-center space-x-2">
+        <form
+          onSubmit={handleSubmit}
+          className="mt-4 flex items-center space-x-2"
+        >
           <textarea
             className="w-full border border-gray-300 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition resize-none"
             value={input}
             onChange={handleInputChange}
-            placeholder="Paste your code here..."
+            placeholder="Enter an interior design prompt..."
             rows={2}
             disabled={loading}
           />
-          <button type="submit" disabled={loading} className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center">
-            {loading ? <div className="loader"></div> : <FiSend size={20} className="rotate-[20deg]" />}
+          <button
+            type="submit"
+            disabled={loading}
+            className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center"
+          >
+            {loading ? (
+              <div className="loader"></div>
+            ) : (
+              <FiSend size={20} className="rotate-[20deg]" />
+            )}
           </button>
         </form>
       </div>
