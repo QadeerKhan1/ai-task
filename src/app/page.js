@@ -20,15 +20,16 @@ const App = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!input.trim()) return;
-
-    // Store user input in messages array
-    const userMessage = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
-
-    setInput("");
+  
     setLoading(true);
     setError("");
-
+  
+    // Show user message immediately
+    const userMessage = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMessage]);
+  
+    setInput("");
+  
     try {
       const res = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -38,38 +39,38 @@ const App = () => {
             {
               role: "user",
               content: `
-You are an advanced AI Code Review Assistant. Your primary role is to analyze user-provided **code snippets** and generate **structured, JSON-formatted feedback**.
-              
----
-
-### **Handling Different Input Scenarios**
-✔ **If the user provides a valid code snippet, evaluate it and return structured JSON feedback.**  
-❌ **If the user provides non-code input, return a JSON response politely stating that only code reviews are supported.**  
-
----
-
-### **Expected JSON Response Format**  
-
-#### **📌 1. Code Evaluation (Valid Code Input)**
-{
-    "input_type": "code",
-    "code_snippet": "<provided_code_snippet>",
-    "evaluation": {
-        "errors": [],
-        "optimizations": [],
-        "best_practices": [],
-        "corrected_code": ""
-    }
-}
-
-#### **📌 2. Non-Code Input (User Provided Text Instead of Code)**
-{
-    "input_type": "non_code",
-    "message": "I am an AI Code Review Assistant. Please provide a valid code snippet for analysis.",
-    "suggestion": "If you're looking for technical insights, debugging assistance, or best practices, paste your code here."
-}
-  ${input}
-              `,
+  You are an advanced AI Code Review Assistant. Your primary role is to analyze user-provided **code snippets** and generate **structured, JSON-formatted feedback**.
+  
+  ---
+  
+  ### **Handling Different Input Scenarios**
+  ✔ **If the user provides a valid code snippet, evaluate it and return structured JSON feedback.**  
+  ❌ **If the user provides non-code input, return a JSON response politely stating that only code reviews are supported.**  
+  
+  ---
+  
+  ### **Expected JSON Response Format**  
+  
+  #### **📌 1. Code Evaluation (Valid Code Input)**
+  {
+      "input_type": "code",
+      "code_snippet": "<provided_code_snippet>",
+      "evaluation": {
+          "errors": [],
+          "optimizations": [],
+          "best_practices": [],
+          "corrected_code": ""
+      }
+  }
+  
+  #### **📌 2. Non-Code Input (User Provided Text Instead of Code)**
+  {
+      "input_type": "non_code",
+      "message": "I am an AI Code Review Assistant. Please provide a valid code snippet for analysis.",
+      "suggestion": "If you're looking for technical insights, debugging assistance, or best practices, paste your code here."
+  }
+    ${input}
+                `,
             },
           ],
           max_tokens: 2000,
@@ -82,21 +83,41 @@ You are an advanced AI Code Review Assistant. Your primary role is to analyze us
           },
         }
       );
-
+  
       const botResponse = res.data.choices[0].message.content;
       const cleanContent = botResponse.replace(/```json|```/g, "").trim();
       const parsedAnalysis = JSON.parse(cleanContent);
-      console.log(parsedAnalysis,'parsedAnalysis')
-      // Store the AI response along with the message
+      console.log(parsedAnalysis, "parsedAnalysis");
+  
+      // Store the AI response along with the user message
       const botMessage = { role: "assistant", content: parsedAnalysis };
-
       setMessages((prev) => [...prev, botMessage]);
+  
     } catch (err) {
-      setError("Something went wrong. Please try again later.");
-    } finally {
+      console.log(
+        "API Error:", 
+        err.response?.data && Object.keys(err.response.data)?.length > 0 
+          ? err.response.data 
+          : err.message || "Unknown error occurred"
+      );
+  
+      // Remove the last user message since the API failed
+      setMessages((prev) => prev.slice(0, -1));
+  
+      // Handle different API error messages
+      if (err.response?.data?.error?.code === "rate_limit_exceeded") {
+        setError(`🚨 API rate limit reached please try again `);
+      } else if (err.response?.data?.error?.message) {
+        setError(`🚨 API Error: ${err.response.data.error.message}`);
+      } else {
+        setError("🚨 Something went wrong. Please try again later.");
+      }
+  } finally {
       setLoading(false);
     }
   };
+  
+  
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -115,18 +136,18 @@ You are an advanced AI Code Review Assistant. Your primary role is to analyze us
             <div
               key={index}
               className={`p-3 rounded-lg ${
-                msg.role === "user"
+                msg?.role === "user"
                   ? "bg-blue-500 text-white self-end"
                   : "bg-gray-200 text-gray-900 self-start"
               }`}
             >
-              {msg.role === "user" ? (
-                msg.content
-              ) : msg.content.input_type === "non_code" ? (
+              {msg?.role === "user" ? (
+                msg?.content
+              ) : msg?.content?.input_type === "non_code" ? (
                 // Non-Code Message Handling
                 <div className="p-4 rounded-lg text-center text-red-600 font-semibold">
-                  🚨 {msg.content.message}
-                  <p className="text-gray-700 mt-2">{msg.content.suggestion}</p>
+                  🚨 {msg?.content?.message}
+                  <p className="text-gray-700 mt-2">{msg?.content?.suggestion}</p>
                 </div>
               ) : (
                 // Code Analysis Section
@@ -136,17 +157,17 @@ You are an advanced AI Code Review Assistant. Your primary role is to analyze us
                   {/* Display Input Code */}
                   <div className="p-3 bg-gray-800 text-white rounded-md">
                     <h3 className="text-md font-semibold">🔹 Your Code:</h3>
-                    <pre className="whitespace-pre-wrap">{msg.content?.code_snippet}</pre>
+                    <pre className="whitespace-pre-wrap">{msg?.content?.code_snippet}</pre>
                   </div>
 
                   {/* Syntax Errors */}
-                  {msg.content?.evaluation?.errors?.length > 0 && (
+                  {msg?.content?.evaluation?.errors?.length > 0 && (
                     <div className="mt-2">
                       <h3 className="font-semibold text-red-600">❌ Errors Found:</h3>
                       <ul className="list-disc list-inside text-red-500">
-                        {msg.content.evaluation.errors.map((error, idx) => (
+                        {msg?.content?.evaluation?.errors?.map((error, idx) => (
                           <li key={idx}>
-                            <strong>Line {error.line}:</strong> {error}
+                            <strong>Line {error?.line}:</strong> {error}
                           </li>
                         ))}
                       </ul>
@@ -154,11 +175,11 @@ You are an advanced AI Code Review Assistant. Your primary role is to analyze us
                   )}
 
                   {/* Optimizations */}
-                  {msg.content?.evaluation?.optimizations?.length > 0 && (
+                  {msg?.content?.evaluation?.optimizations?.length > 0 && (
                     <div className="mt-2">
                       <h3 className="font-semibold text-yellow-600">⚡ Optimizations Suggested:</h3>
                       <ul className="list-disc list-inside text-yellow-500">
-                        {msg.content.evaluation.optimizations.map((opt, idx) => (
+                        {msg?.content?.evaluation?.optimizations?.map((opt, idx) => (
                           <li key={idx}>
                             {opt}
                            
@@ -169,11 +190,11 @@ You are an advanced AI Code Review Assistant. Your primary role is to analyze us
                   )}
 
                   {/* Best Practices */}
-                  {msg.content?.evaluation?.best_practices?.length > 0 && (
+                  {msg?.content?.evaluation?.best_practices?.length > 0 && (
                     <div className="mt-2">
                       <h3 className="font-semibold text-green-600">✅ Best Practices:</h3>
                       <ul className="list-disc list-inside text-green-500">
-                        {msg.content.evaluation.best_practices.map((bp, idx) => (
+                        {msg?.content?.evaluation?.best_practices?.map((bp, idx) => (
                           <li key={idx}>{bp}</li>
                         ))}
                       </ul>
@@ -181,10 +202,10 @@ You are an advanced AI Code Review Assistant. Your primary role is to analyze us
                   )}
 
                   {/* Corrected Code */}
-                  {msg.content?.evaluation?.corrected_code && (
+                  {msg?.content?.evaluation?.corrected_code && (
                     <div className="mt-4 p-3 bg-gray-800 text-white rounded-md">
                       <h3 className="text-md font-semibold">🚀 Corrected Code:</h3>
-                      <pre className="whitespace-pre-wrap">{msg.content.evaluation.corrected_code}</pre>
+                      <pre className="whitespace-pre-wrap">{msg?.content?.evaluation?.corrected_code}</pre>
                     </div>
                   )}
                 </div>
